@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <title>Realtime communication with WebRTC</title>
+
+  <link rel="stylesheet" href="/css/main.css" />
+
+</head>
+
+<body>
+
+  <h1>Realtime communication with WebRTC</h1>
+
+  <h2>
+    <span>Room: </span><span id="room">...</span>
+  </h2>
+
+  <h3>your chat name</h3>
+  <p id="localPeerName"></p>
+
+  <div id="outgoing">
+    <h2>Outgoing messages</h2>
+    <textarea id="outgoingText"></textarea>
+  </div>
+
+  <div id="buttons">
+    <button id="send">Send</button>
+  </div>
+
+  <h3>Chat name of the remote peer</h3>
+  <p id="remotePeerName"></p>
+
+  <div id="incoming">
+    <h2>Incoming messages</h2>
+    <textarea id="incomingText"></textarea>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+
+</html>
