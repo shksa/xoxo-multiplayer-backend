@@ -1,24 +1,96 @@
 'use strict';
 
 const os = require('os');
-// var http = require('http');
-const Server = require('socket.io');
-const io = new Server(8000)
+const io = require('socket.io')(8000, {
+  pingInterval: 6000,
+  pingTimeout: 5000,
+});
 
 // An alias for the default (/) namespace.
 io.sockets.on('connection', (socket) => {
+
   // convenience function to log server messages on the client
-  const log = (msg) => {
-    console.log(`Message from server: ${msg}`)
-    socket.emit('log', `Message from server: ${msg}`)
+  const log = (...msgs) => {
+    console.log('Message from server:', ...msgs)
+    socket.emit('log', 'Message from server:', ...msgs)
   }
 
-  socket.on('signaling2Server4mClient', (message) => {
-    const {peerName, room} = socket
-    log(`${peerName} said ${message}`);
-    // for a real app, would be room-only (not broadcast)
-    socket.broadcast.to(room).emit('signaling2Client4mServer', message, peerName);
+  socket.on('registerNameWithSocket', (playerName, ackFn) => {
+    socket["playerName"] = playerName
+    const msg = `Name ${playerName} registered with the socket`
+    ackFn(msg)
+  })
+
+  socket.on('signalOfferToRemotePlayer', (offerMessage, remotePlayerSocketID) => {
+    const {playerName} = socket
+
+    log(`${playerName} wants to signal OFFER message to remote player ${io.sockets.to("AvailablePlayersRoom").sockets[remotePlayerSocketID].playerName} with message:`, offerMessage);
+
+    socket.broadcast.to(remotePlayerSocketID).emit('offerFromRemotePlayer', offerMessage, playerName, socket.id)
   });
+
+  socket.on('signalCandidateToRemotePlayer', (candidateMessage, remotePlayerSocketID) => {
+    const {playerName} = socket
+    
+    log(`${playerName} wants to signal CANDIDATE message to remote player ${io.sockets.to("AvailablePlayersRoom").sockets[remotePlayerSocketID].playerName} with message:`, candidateMessage);
+    
+    socket.broadcast.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage)
+  });
+
+  socket.on('signalAnswerToRemotePlayer', (answerMessage, remotePlayerSocketID) => {
+    const {playerName} = socket
+    
+    log(`${playerName} wants to signal ANSWER message to remote player ${io.sockets.to("AvailablePlayersRoom").sockets[remotePlayerSocketID].playerName} with message:`, answerMessage);
+    
+    socket.broadcast.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerMessage)
+  });
+
+  socket.on('exitFromAvailablePlayersRoom', (ackFn) => {
+    log('Received request to leave "AvailablePlayersRoom"' + ' from ' + socket.playerName);
+
+    io.sockets.adapter.del(socket.id, "AvailablePlayersRoom", (err) => {
+      if (err) {
+        console.error("Trouble in leaving 'AvailablePlayersRoom' ", err)
+        return
+      }
+      ackFn("left!")
+
+      const socketsDictionary = io.sockets.adapter.rooms["AvailablePlayersRoom"]
+
+      const availablePlayersRoomSockets = socketsDictionary ? socketsDictionary.sockets : {}
+      
+      const availablePlayers = Object.entries(availablePlayersRoomSockets).map(([playerSocketID, boolean]) => ({name: io.sockets.sockets[playerSocketID].playerName, socketID: playerSocketID, boolean}))
+      
+      log(`Room "AvailablePlayersRoom" now has ${availablePlayers.length} player(s)`);
+      
+      log(`Player ${socket.playerName} with client ID ${socket.id} exited from the room "AvailablePlayersRoom"`)
+      
+      io.sockets.in("AvailablePlayersRoom").emit("playersInAvailableRoom", availablePlayers)
+    })
+  })
+
+  socket.on('joinAvailablePlayersRoom', (ackFn) => {
+    log('Received request to create or join room "AvailablePlayersRoom"' + ' from ' + socket.playerName);
+
+    io.sockets.adapter.add(socket.id, "AvailablePlayersRoom", (err) => {
+      if (err) {
+        console.error("Trouble in joining 'AvailablePlayersRoom' ", err)
+        ackFn(`could not join due to error: ${err.toString()}`)
+        return
+      }
+      ackFn("joined!")
+
+      const availablePlayersRoomSockets = io.sockets.adapter.rooms["AvailablePlayersRoom"].sockets
+      
+      const availablePlayers = Object.entries(availablePlayersRoomSockets).map(([playerSocketID, boolean]) => ({name: io.sockets.sockets[playerSocketID].playerName, socketID: playerSocketID, boolean}))
+      
+      log(`Room "AvailablePlayersRoom" now has ${availablePlayers.length} player(s)`);
+      
+      log(`Player ${socket.playerName} with client ID ${socket.id} joined the room "AvailablePlayersRoom"`)
+      
+      io.sockets.in("AvailablePlayersRoom").emit("playersInAvailableRoom", availablePlayers)
+    })
+  })
 
   socket.on('create or join', (room, peerName) => {
     log('Received request to create or join room ' + room + ' from ' + peerName);
@@ -30,25 +102,25 @@ io.sockets.on('connection', (socket) => {
     if (numClients === 0) {
       socket.join(room, (err) => {
         if (err) {
-          console.log("Trouble in joining room ", err)
+          console.error("Trouble in joining room ", err)
           return
         }
         socket["room"] = room
         socket["peerName"] = peerName
-        log(`PeerName ${peerName} with Client ID ${socket.id} CREATED the room ${room}`);
+        log(`PeerName ${peerName} with client ID ${socket.id} CREATED the room ${room}`);
         socket.emit('created', room, socket.id);
       });
     } else if (numClients === 1) {
-      log(`PeerName ${peerName} with Client ID ${socket.id} JOINED the room ${room}`);
+      log(`PeerName ${peerName} with client ID ${socket.id} JOINED the room ${room}`);
       socket.join(room, (err) => {
         if (err) {
-          console.log("Trouble in joining room ", err)
+          console.error("Trouble in joining room ", err)
           return
         }
         socket["room"] = room
         socket["peerName"] = peerName
         socket.emit('joined', room, socket.id);
-        socket.broadcast.to(room).emit('ready', room);
+        socket.broadcast.to(room).emit('remotePeerJoinedRoom', room);
       });
     } else { // max two clients
       socket.emit('full', room);
@@ -66,29 +138,20 @@ io.sockets.on('connection', (socket) => {
     }
   });
 
-  socket.on('shareMyName', () => {
-    const {peerName, room} = socket
-    socket.broadcast.to(room).emit('remotePeerName', peerName);
-  })
-
   socket.on('disconnect', (reason) => {
-    const {peerName, room} = socket
-    const msg = `Peer ${peerName} is disconnected. Reason: ${reason}.`
+    const msg = `player ${socket.playerName} is disconnected. Reason: ${reason}.`
     console.log(msg);
-    socket.broadcast.to(room).emit('leftRoom', msg);
-  });
 
-  socket.on('leaveRoom', () => {
-    const {peerName, room} = socket
-    const msg = `Peer ${peerName} has left the room ${room}.`
-    socket.leave(room, (err) => {
-      if (err) {
-        console.log("Trouble in leaving room ", err)
-        return
-      }
-      console.log(msg);
-      socket.emit('leftRoom', msg)
-      io.sockets.in(room).emit('remotePeerLeftRoom', msg);
-    })
+    const socketsDictionary = io.sockets.adapter.rooms["AvailablePlayersRoom"]
+
+    const availablePlayersRoomSockets = socketsDictionary ? socketsDictionary.sockets : {}
+    
+    const availablePlayers = Object.entries(availablePlayersRoomSockets).map(([playerSocketID, boolean]) => ({name: io.sockets.sockets[playerSocketID].playerName, socketID: playerSocketID, boolean}))
+    
+    log(`Room "AvailablePlayersRoom" now has ${availablePlayers.length} player(s)`);
+    
+    log(`Player ${socket.playerName} with client ID ${socket.id} exited from the room "AvailablePlayersRoom"`)
+    
+    io.sockets.in("AvailablePlayersRoom").emit("playersInAvailableRoom", availablePlayers)
   });
 });
