@@ -1,15 +1,17 @@
 {
-  "name": "webrtc-codelab",
+  "name": "xoxo-backend",
   "version": "1.0.0",
-  "description": "WebRTC codelab",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
+  "description": "backend signalling server for the WebRTC clients(browsers).",
+  "main": "src/index.js",
+  "repository": "https://github.com/shksa/xoxo-multiplayer-backend.git",
+  "author": "sreekar <sreekar339@gmail.com>",
+  "license": "MIT",
+  "private": true,
   "dependencies": {
-    "node-static": "^0.7.11",
+    "@types/socket.io": "^2.1.0",
     "socket.io": "^2.1.1"
+  },
+  "scripts": {
+    "start": "node index.js"
   }
 }
