@@ -1,20 +1,20 @@
 {
   "compilerOptions": {
+    "module": "commonjs",
     "outDir": "./built",
-    "allowJs": true,
-    "checkJs": true,
-    "lib": [
-      "es2018", "dom"
-    ],
+    "target": "esnext",
+    "lib": ["es2015", "es2016", "es2017", "es2018", "esnext", "dom"],
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "strictNullChecks": true,
+    "sourceMap": true
   },
   "exclude": [
     "node_modules", "**/node_modules/*"
   ],
   "include": [
-    "./src/**/*" // Read in any files it understands in the src directory 
+    "src/**/*" // Read in any files it understands in the src directory 
   ]
 }

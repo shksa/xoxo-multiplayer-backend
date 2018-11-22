@@ -12,6 +12,7 @@
     "socket.io": "^2.1.1"
   },
   "scripts": {
-    "start": "node index.js"
+    "build": "tsc",
+    "start": "yarn build && node built/index.js"
   }
 }
