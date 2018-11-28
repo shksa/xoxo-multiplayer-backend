@@ -51,6 +51,14 @@ io.on('connection', (socket) => {
         log(`${playerName} wants to signal CANDIDATE message to remote player ${socketToPlayerName.get(remotePlayerSocketID)} with message: ${candidateMessage}`);
         io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage, playerName, socket.id);
     });
+    socket.on('sendRejectionResponseToPeers', (peersToRejectConnection, ackFn) => {
+        const playerName = socketToPlayerName.get(socket.id);
+        log(`Received request to send rejection message to the peers ${peersToRejectConnection} from ${playerName}`);
+        peersToRejectConnection.forEach(socketID => {
+            io.to(socketID).emit("rejectionFromRequestedPlayer", playerName);
+        });
+        ackFn({ message: "Successfully sent the rejection message to the given peers", code: 200 });
+    });
     socket.on('signalAnswerToRemotePlayer', (answerMessage, remotePlayerSocketID) => {
         const playerName = socketToPlayerName.get(socket.id);
         const remotePlayerSocketStillInAvailableRoom = IsPlayerInAvailableRoom(remotePlayerSocketID);

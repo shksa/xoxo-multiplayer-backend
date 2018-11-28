@@ -8,6 +8,13 @@ const io = Server(8000, {
 
 const AvailablePlayersRoom = "AvailablePlayersRoom"
 
+interface SocketResponse {
+  message: string
+  code: number
+}
+
+type AckFn = (resp: SocketResponse) => void
+
 let socketToPlayerName: Map<string, string> = new Map()
 
 function GetAvailablePlayers() {
@@ -34,7 +41,7 @@ io.on('connection', (socket) => {
     socket.emit('log', logMsg)
   }
 
-  socket.on('registerNameWithSocket', (playerName, ackFn) => {
+  socket.on('registerNameWithSocket', (playerName: string, ackFn: AckFn) => {
     socketToPlayerName.set(socket.id, playerName)
     const msg = `Name ${playerName} registered with the socket`
     ackFn({message: msg, code: 200})
@@ -80,6 +87,17 @@ io.on('connection', (socket) => {
     io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage, playerName, socket.id)
   });
 
+  socket.on('sendRejectionResponseToPeers', (peersToRejectConnection: Array<string>, ackFn: AckFn) => {
+    const playerName =  socketToPlayerName.get(socket.id)
+    log(`Received request to send rejection message to the peers ${peersToRejectConnection} from ${playerName}`)
+    
+    peersToRejectConnection.forEach(socketID => {
+      io.to(socketID).emit("rejectionFromRequestedPlayer", playerName)
+    })
+    
+    ackFn({message: "Successfully sent the rejection message to the given peers", code: 200})
+  })
+
   socket.on('signalAnswerToRemotePlayer', (answerMessage, remotePlayerSocketID) => {
     
     const playerName = socketToPlayerName.get(socket.id)
@@ -100,7 +118,7 @@ io.on('connection', (socket) => {
     io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerMessage, playerName, socket.id)
   });
 
-  socket.on('exitFromAvailablePlayersRoom', (ackFn) => {
+  socket.on('exitFromAvailablePlayersRoom', (ackFn: AckFn) => {
     log(`Received request to leave AvailablePlayersRoom from ${socketToPlayerName.get(socket.id)}`);
 
     socket.leave(AvailablePlayersRoom, (err: Error) => {
@@ -121,7 +139,7 @@ io.on('connection', (socket) => {
     })
   })
 
-  socket.on('joinAvailablePlayersRoom', (ackFn) => {
+  socket.on('joinAvailablePlayersRoom', (ackFn: AckFn) => {
     log('Received request to create or join room AvailablePlayersRoom' + ' from ' + socketToPlayerName.get(socket.id));
 
     socket.join(AvailablePlayersRoom, (err) => {
