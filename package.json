@@ -1,5 +1,5 @@
 {
-  "name": "xoxo-backend",
+  "name": "xoxo-multiplayer-backend",
   "version": "1.0.0",
   "description": "backend signalling server for the WebRTC clients(browsers).",
   "main": "src/index.js",
@@ -15,8 +15,8 @@
     "build": "tsc",
     "watch-ts": "tsc -w",
     "start-dev": "NODE_ENV=DEV nodemon built/src/index.js",
-    "start": "yarn build && NODE_ENV=PROD pm2 start built/src/index.js",
-    "stop": "pm2 stop all",
+    "start": "yarn build && NODE_ENV=PROD pm2 start built/src/index.js -name xoxo-multiplayer-backend",
+    "stop": "pm2 stop xoxo-multiplayer-backend",
     "deploy": "zsh deploy/deploy.sh"
   },
   "devDependencies": {
