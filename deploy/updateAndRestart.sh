@@ -8,6 +8,10 @@ rm -rf ~/xoxo-multiplayer/xoxo-multiplayer-backend
 echo "cloning the new version of repo"
 git clone git@github.com:shksa/xoxo-multiplayer-backend.git ~/xoxo-multiplayer/xoxo-multiplayer-backend
 
+pm2 kill 
+
+pm2 status
+
 echo "cd'ing into the repo location"
 cd ~/xoxo-multiplayer/xoxo-multiplayer-backend
 
