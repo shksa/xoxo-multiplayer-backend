@@ -4,7 +4,7 @@ set -e
 
 rm -rf ~/xoxo-multiplayer/xoxo-multiplayer-backend
 
-git clone https://github.com/shksa/xoxo-multiplayer-backend.git ~/xoxo-multiplayer/xoxo-multiplayer-backend
+git clone git@github.com:shksa/xoxo-multiplayer-backend.git ~/xoxo-multiplayer/xoxo-multiplayer-backend
 
 cd ~/xoxo-multiplayer/xoxo-multiplayer-backend
 
