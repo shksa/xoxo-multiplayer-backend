@@ -9,14 +9,17 @@ const config_json_1 = __importDefault(require("../config.json"));
 let serverConfig;
 switch (process.env.NODE_ENV) {
     case "PROD":
+        console.log("Using NODE_ENV=PROD");
         serverConfig = { port: config_json_1.default.PROD.PORT };
         break;
     case "DEV":
+        console.log("Using NODE_ENV=DEV");
         serverConfig = { port: config_json_1.default.DEV.PORT };
         break;
     default:
         throw "INVALID VALUE FOR NODE_ENV. MUST BE EITHER PROD OR DEV";
 }
+console.log("serverConfig: ", serverConfig);
 const io = socket_io_1.default(serverConfig.port, {
     path: "/socketConnectionNamespace"
     // pingInterval: 6000,

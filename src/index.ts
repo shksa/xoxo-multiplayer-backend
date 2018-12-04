@@ -6,16 +6,20 @@ let serverConfig : {port: number}
 
 switch (process.env.NODE_ENV) {
   case "PROD":
+    console.log("Using NODE_ENV=PROD")
     serverConfig = {port: config.PROD.PORT}
     break;
 
   case "DEV":
+    console.log("Using NODE_ENV=DEV")
     serverConfig = {port: config.DEV.PORT}
     break;
 
   default:
     throw "INVALID VALUE FOR NODE_ENV. MUST BE EITHER PROD OR DEV";
 }
+
+console.log("serverConfig: ", serverConfig)
 
 const io = Server(serverConfig.port, {
   path: "/socketConnectionNamespace"
