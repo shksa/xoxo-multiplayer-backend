@@ -1,0 +1,1 @@
+ssh sreekar339@139.59.93.218 'bash' < ./updateAndRestart.sh

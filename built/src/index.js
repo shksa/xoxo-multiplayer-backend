@@ -1,8 +1,23 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const os = require("os");
-const Server = require("socket.io");
-const io = Server(8000, {
+const os_1 = __importDefault(require("os"));
+const socket_io_1 = __importDefault(require("socket.io"));
+const config_json_1 = __importDefault(require("../config.json"));
+let serverConfig;
+switch (process.env.NODE_ENV) {
+    case "PROD":
+        serverConfig = { port: config_json_1.default.PROD.PORT };
+        break;
+    case "DEV":
+        serverConfig = { port: config_json_1.default.DEV.PORT };
+        break;
+    default:
+        throw "INVALID VALUE FOR NODE_ENV. MUST BE EITHER PROD OR DEV";
+}
+const io = socket_io_1.default(serverConfig.port, {
 // pingInterval: 6000,
 // pingTimeout: 5000,
 });
@@ -101,7 +116,7 @@ io.on('connection', (socket) => {
         });
     });
     socket.on('ipaddr', () => {
-        const ifaces = os.networkInterfaces();
+        const ifaces = os_1.default.networkInterfaces();
         for (const dev in ifaces) {
             ifaces[dev].forEach((details) => {
                 if (details.family === 'IPv4' && details.address !== '127.0.0.1') {

@@ -1,7 +1,23 @@
-import os = require('os');
-import Server = require('socket.io')
+import os from 'os';
+import Server from 'socket.io'
+import config from '../config.json'
 
-const io = Server(8000, {
+let serverConfig : {port: number}
+
+switch (process.env.NODE_ENV) {
+  case "PROD":
+    serverConfig = {port: config.PROD.PORT}
+    break;
+
+  case "DEV":
+    serverConfig = {port: config.DEV.PORT}
+    break;
+
+  default:
+    throw "INVALID VALUE FOR NODE_ENV. MUST BE EITHER PROD OR DEV";
+}
+
+const io = Server(serverConfig.port, {
   // pingInterval: 6000,
   // pingTimeout: 5000,
 });
