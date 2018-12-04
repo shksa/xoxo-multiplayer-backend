@@ -18,6 +18,7 @@ switch (process.env.NODE_ENV) {
 }
 
 const io = Server(serverConfig.port, {
+  path: "/socketConnectionNamespace"
   // pingInterval: 6000,
   // pingTimeout: 5000,
 });

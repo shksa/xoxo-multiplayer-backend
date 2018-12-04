@@ -18,8 +18,9 @@ switch (process.env.NODE_ENV) {
         throw "INVALID VALUE FOR NODE_ENV. MUST BE EITHER PROD OR DEV";
 }
 const io = socket_io_1.default(serverConfig.port, {
-// pingInterval: 6000,
-// pingTimeout: 5000,
+    path: "/socketConnectionNamespace"
+    // pingInterval: 6000,
+    // pingTimeout: 5000,
 });
 const AvailablePlayersRoom = "AvailablePlayersRoom";
 let socketToPlayerName = new Map();
