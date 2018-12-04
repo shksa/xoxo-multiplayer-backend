@@ -17,7 +17,7 @@
     "start-dev": "NODE_ENV=DEV nodemon built/src/index.js",
     "start": "yarn build && NODE_ENV=PROD pm2 start built/src/index.js --name xoxo-multiplayer-backend",
     "stop": "pm2 stop xoxo-multiplayer-backend",
-    "pushToGithubMaster": "gp origin master",
+    "pushToGithubMaster": "git push origin master",
     "predeploy": "yarn pushToGithubMaster",
     "deploy": "zsh deploy/deploy.sh"
   },
