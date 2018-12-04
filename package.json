@@ -15,7 +15,7 @@
     "build": "tsc",
     "watch-ts": "tsc -w",
     "start-dev": "NODE_ENV=DEV nodemon built/src/index.js",
-    "start": "yarn build && NODE_ENV=PROD pm2 start built/src/index.js -name xoxo-multiplayer-backend",
+    "start": "yarn build && NODE_ENV=PROD pm2 start built/src/index.js --name xoxo-multiplayer-backend",
     "stop": "pm2 stop xoxo-multiplayer-backend",
     "deploy": "zsh deploy/deploy.sh"
   },
