@@ -21,7 +21,7 @@ switch (process.env.NODE_ENV) {
 }
 console.log("serverConfig: ", serverConfig);
 const io = socket_io_1.default(serverConfig.port, {
-    path: "/socketConnectionNamespace"
+    path: "/xoxo-multiplayer-socketConnectionNamespace"
     // pingInterval: 6000,
     // pingTimeout: 5000,
 });
