@@ -21,13 +21,9 @@ switch (process.env.NODE_ENV) {
 
 console.log("serverConfig: ", serverConfig)
 
-const io = Server(serverConfig.port, {
-  path: "/xoxo-multiplayer-socketConnectionNamespace"
-  // pingInterval: 6000,
-  // pingTimeout: 5000,
-});
+const transportPath = "/xoxo-multiplayer-socketConnectionNamespace"
 
-const AvailablePlayersRoom = "AvailablePlayersRoom"
+const AvailablePlayersRoomName = "AvailablePlayersRoom"
 
 interface SocketResponse {
   message: string
@@ -36,84 +32,117 @@ interface SocketResponse {
 
 type AckFn = (resp: SocketResponse) => void
 
-let socketToPlayerName: Map<string, string> = new Map()
+type socketID = string
+interface PlayerInfo {
+  name: string
+  avatar: string
+}
+
+let socketIDToPlayerInfo: Map<socketID, PlayerInfo> = new Map()
+
+const io = Server(serverConfig.port, {
+  path: transportPath
+  // pingInterval: 6000,
+  // pingTimeout: 5000,
+});
 
 function GetAvailablePlayers() {
-  const socketsDictionary = io.of("/").adapter.rooms[AvailablePlayersRoom]
+  const availablePlayersRoom = io.of("/").adapter.rooms[AvailablePlayersRoomName]
 
-  const availablePlayersRoomSockets = socketsDictionary ? socketsDictionary.sockets : {}
+  const socketsInAvailablePlayersRoom = availablePlayersRoom ? availablePlayersRoom.sockets : {}
   
-  const availablePlayers = Object.entries(availablePlayersRoomSockets).map(([playerSocketID, boolean]) => ({name: socketToPlayerName.get(playerSocketID), socketID: playerSocketID, boolean}))
+  const availablePlayers = Object.entries(socketsInAvailablePlayersRoom).map(([playerSocketID, boolean]) => {
+    const {name, avatar} = socketIDToPlayerInfo.get(playerSocketID) as PlayerInfo
+    return {
+      socketID: playerSocketID, name, avatar, boolean
+    }
+  })
 
   return availablePlayers
 }
 
 function IsPlayerInAvailableRoom(playerSocketID: string) {
-  const result = io.of("/").adapter.rooms[AvailablePlayersRoom].sockets[playerSocketID]
+  const result = io.of("/").adapter.rooms[AvailablePlayersRoomName].sockets[playerSocketID]
   return result
 }
 
+// We call the default namespace "/" and it’s the one Socket.IO clients connect to by default, and the one the server listens to by default.
+// This namespace is identified by `io.sockets` or simply `io`
 
 io.on('connection', (socket) => {
-
+  console.log(`socket ${socket.id} is connected!`)
   function log(msg: string) {
     const logMsg = `Message from server: ${msg}`
     console.log(logMsg)
     socket.emit('log', logMsg)
   }
 
-  socket.on('registerNameWithSocket', (playerName: string, ackFn: AckFn) => {
-    socketToPlayerName.set(socket.id, playerName)
-    const msg = `Name ${playerName} registered with the socket`
+  socket.on('registerNameAndAvatarWithSocket', (playerName: string, avatar: string, ackFn: AckFn) => {
+    const playerInfo: PlayerInfo = {name: playerName, avatar}
+    socketIDToPlayerInfo.set(socket.id, playerInfo)
+    const msg = `Name ${playerName}, and avatar registered with the socket`
     ackFn({message: msg, code: 200})
   })
 
   socket.on('signalOfferToRemotePlayer', (offerMessage, remotePlayerSocketID) => {
     
-    const playerName = socketToPlayerName.get(socket.id)
+    const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
     const remotePlayerSocketStillInAvailableRoom = IsPlayerInAvailableRoom(remotePlayerSocketID)
 
     if (!remotePlayerSocketStillInAvailableRoom) {
 
-      log(`Remote player ${socketToPlayerName.get(socket.id)} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`)
+      const errorMsg = `Remote player ${socketIDToPlayerInfo.get(socket.id)!.name} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`
 
-      io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", GetAvailablePlayers())
+      log(errorMsg)
+
+      io.to(socket.id).emit("error", errorMsg)
+
+      io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", GetAvailablePlayers())
       
       return
     }
 
-    log(`${playerName} wants to signal OFFER message to remote player ${socketToPlayerName.get(remotePlayerSocketID)} with message: ${offerMessage}`);
+    const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
 
-    io.to(remotePlayerSocketID).emit('offerFromRemotePlayer', offerMessage, playerName, socket.id)
+    log(`${selfInfo.name} wants to signal OFFER message to remote player ${remotePlayerInfo!.name} with message: ${offerMessage}`);
+
+    io.to(remotePlayerSocketID).emit('offerFromRemotePlayer', offerMessage, selfInfo.name, socket.id)
   });
 
   socket.on('signalCandidateToRemotePlayer', (candidateMessage, remotePlayerSocketID) => {
     
-    const playerName = socketToPlayerName.get(socket.id)
+    const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
     const remotePlayerSocketStillInAvailableRoom = IsPlayerInAvailableRoom(remotePlayerSocketID)
 
     if (!remotePlayerSocketStillInAvailableRoom) {
 
-      log(`Remote player ${socketToPlayerName.get(remotePlayerSocketID)} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`)
+      const errorMsg = `Remote player ${socketIDToPlayerInfo.get(socket.id)!.name} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`
 
-      io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", GetAvailablePlayers())
+      log(errorMsg)
+
+      io.to(socket.id).emit("error", errorMsg)
+
+      io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", GetAvailablePlayers())
       
       return
     }
+
+    const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
     
-    log(`${playerName} wants to signal CANDIDATE message to remote player ${socketToPlayerName.get(remotePlayerSocketID)} with message: ${candidateMessage}`);
+    log(`${selfInfo.name} wants to signal CANDIDATE message to remote player ${remotePlayerInfo.name} with message: ${candidateMessage}`);
     
-    io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage, playerName, socket.id)
+    io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage, selfInfo.name, socket.id)
   });
 
   socket.on('sendRejectionResponseToPeers', (peersToRejectConnection: Array<string>, ackFn: AckFn) => {
-    const playerName =  socketToPlayerName.get(socket.id)
-    log(`Received request to send rejection message to the peers ${peersToRejectConnection} from ${playerName}`)
+    const selfInfo =  socketIDToPlayerInfo.get(socket.id) as PlayerInfo
+
+    log(`Received request to send rejection message to the peers ${peersToRejectConnection} from ${selfInfo.name}`)
     
     peersToRejectConnection.forEach(socketID => {
-      io.to(socketID).emit("rejectionFromRequestedPlayer", playerName)
+      io.to(socketID).emit("rejectionFromRequestedPlayer", selfInfo.name)
     })
     
     ackFn({message: "Successfully sent the rejection message to the given peers", code: 200})
@@ -121,34 +150,40 @@ io.on('connection', (socket) => {
 
   socket.on('signalAnswerToRemotePlayer', (answerMessage, remotePlayerSocketID) => {
     
-    const playerName = socketToPlayerName.get(socket.id)
+    const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
     const remotePlayerSocketStillInAvailableRoom = IsPlayerInAvailableRoom(remotePlayerSocketID)
 
     if (!remotePlayerSocketStillInAvailableRoom) {
 
-      log(`Remote player ${socketToPlayerName.get(remotePlayerSocketID)} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`)
+      const errorMsg = `Remote player ${socketIDToPlayerInfo.get(socket.id)!.name} with client ID ${remotePlayerSocketID} not in room AvailablePlayersRoom anymore`
 
-      io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", GetAvailablePlayers())
+      log(errorMsg)
+
+      io.to(socket.id).emit("error", errorMsg)
+
+      io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", GetAvailablePlayers())
       
       return
     }
+
+    const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
     
-    log(`${playerName} wants to signal ANSWER message to remote player ${socketToPlayerName.get(remotePlayerSocketID)} with message: ${answerMessage}`);
+    log(`${selfInfo.name} wants to signal ANSWER message to remote player ${remotePlayerInfo.name} with message: ${answerMessage}`);
     
-    io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerMessage, playerName, socket.id)
+    io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerMessage, selfInfo.name, socket.id)
   });
 
   socket.on('exitFromAvailablePlayersRoom', (ackFn: AckFn) => {
-    log(`Received request to leave AvailablePlayersRoom from ${socketToPlayerName.get(socket.id)}`);
+    log(`Received request to leave AvailablePlayersRoom from ${socketIDToPlayerInfo.get(socket.id)}`);
 
-    socket.leave(AvailablePlayersRoom, (err: Error) => {
+    socket.leave(AvailablePlayersRoomName, (err: Error) => {
       if (err) {
         log(`Trouble in leaving AvailablePlayersRoom : ${err}`)
         ackFn({message: `could not leave AvailablePlayersRoom : ${err}`, code: 500})
         return
       }
-      log(`Player ${socketToPlayerName.get(socket.id)} with client ID ${socket.id} exited from the room AvailablePlayersRoom`)
+      log(`Player ${socketIDToPlayerInfo.get(socket.id)} with client ID ${socket.id} exited from the room AvailablePlayersRoom`)
 
       ackFn({message: "left AvailablePlayersRoom!", code: 200})
       
@@ -156,21 +191,23 @@ io.on('connection', (socket) => {
 
       log(`Room AvailablePlayersRoom now has ${availablePlayers.length} player(s)`);
       
-      io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", availablePlayers)
+      io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", availablePlayers)
     })
   })
 
   socket.on('joinAvailablePlayersRoom', (ackFn: AckFn) => {
-    log('Received request to create or join room AvailablePlayersRoom' + ' from ' + socketToPlayerName.get(socket.id));
+    log('Received request to create or join room AvailablePlayersRoom' + ' from ' + socketIDToPlayerInfo.get(socket.id));
 
-    socket.join(AvailablePlayersRoom, (err) => {
+    socket.join(AvailablePlayersRoomName, (err) => {
       if (err) {
         log(`Trouble in joining AvailablePlayersRoom : ${err}`)
         ackFn({message: `could not join AvailablePlayersRoom : ${err}`, code: 500})
         return
       }
 
-      log(`Player ${socketToPlayerName.get(socket.id)} with client ID ${socket.id} joined the room AvailablePlayersRoom`)
+      const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
+
+      log(`Player ${selfInfo.name} with client ID ${socket.id} joined the room AvailablePlayersRoom`)
 
       ackFn({message: "joined AvailablePlayersRoom!", code: 200})
 
@@ -178,7 +215,7 @@ io.on('connection', (socket) => {
       
       log(`Room AvailablePlayersRoom now has ${availablePlayers.length} player(s)`);
       
-      io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", availablePlayers)
+      io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", availablePlayers)
     })
   })
 
@@ -194,14 +231,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', (reason) => {
-    log(`Player ${socketToPlayerName.get(socket.id)} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
+    log(`Player ${socketIDToPlayerInfo.get(socket.id)} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
 
-    socketToPlayerName.delete(socket.id)
+    socketIDToPlayerInfo.delete(socket.id)
 
     const availablePlayers = GetAvailablePlayers()
     
     log(`Room AvailablePlayersRoom now has ${availablePlayers.length} player(s)`);
 
-    io.to(AvailablePlayersRoom).emit("playersInAvailableRoom", availablePlayers)
+    io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", availablePlayers)
   });
 });
