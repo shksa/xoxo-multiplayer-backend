@@ -30,6 +30,15 @@ interface SocketResponse {
   code: number
 }
 
+interface AnswerSignal extends RTCSessionDescription {}
+interface OfferSignal extends RTCSessionDescription {}
+
+interface CandidateSignal {
+  type: 'candidate'
+  candidate: RTCIceCandidateInit
+}
+
+
 type AckFn = (resp: SocketResponse) => void
 
 type socketID = string
@@ -84,7 +93,7 @@ io.on('connection', (socket) => {
     ackFn({message: msg, code: 200})
   })
 
-  socket.on('signalOfferToRemotePlayer', (offerMessage, remotePlayerSocketID) => {
+  socket.on('signalOfferToRemotePlayer', (offersignal: OfferSignal, remotePlayerSocketID: string) => {
     
     const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
@@ -105,12 +114,12 @@ io.on('connection', (socket) => {
 
     const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
 
-    log(`${selfInfo.name} wants to signal OFFER message to remote player ${remotePlayerInfo!.name} with message: ${offerMessage}`);
+    log(`${selfInfo.name} wants to signal OFFER message to remote player ${remotePlayerInfo!.name} with message: ${JSON.stringify(offersignal)}`);
 
-    io.to(remotePlayerSocketID).emit('offerFromRemotePlayer', offerMessage, selfInfo.name, socket.id)
+    io.to(remotePlayerSocketID).emit('offerFromRemotePlayer', offersignal, selfInfo.name, socket.id)
   });
 
-  socket.on('signalCandidateToRemotePlayer', (candidateMessage, remotePlayerSocketID) => {
+  socket.on('signalCandidateToRemotePlayer', (candidateSignal:  CandidateSignal, remotePlayerSocketID: string) => {
     
     const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
@@ -131,9 +140,9 @@ io.on('connection', (socket) => {
 
     const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
     
-    log(`${selfInfo.name} wants to signal CANDIDATE message to remote player ${remotePlayerInfo.name} with message: ${candidateMessage}`);
+    log(`${selfInfo.name} wants to signal CANDIDATE message to remote player ${remotePlayerInfo.name} with message: ${JSON.stringify(candidateSignal)}`);
     
-    io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateMessage, selfInfo.name, socket.id)
+    io.to(remotePlayerSocketID).emit('candidateFromRemotePlayer', candidateSignal, selfInfo.name, socket.id)
   });
 
   socket.on('sendRejectionResponseToPeers', (peersToRejectConnection: Array<string>, ackFn: AckFn) => {
@@ -148,7 +157,7 @@ io.on('connection', (socket) => {
     ackFn({message: "Successfully sent the rejection message to the given peers", code: 200})
   })
 
-  socket.on('signalAnswerToRemotePlayer', (answerMessage, remotePlayerSocketID) => {
+  socket.on('signalAnswerToRemotePlayer', (answerSignal: AnswerSignal, remotePlayerSocketID: string) => {
     
     const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
 
@@ -169,9 +178,9 @@ io.on('connection', (socket) => {
 
     const remotePlayerInfo = socketIDToPlayerInfo.get(remotePlayerSocketID) as PlayerInfo
     
-    log(`${selfInfo.name} wants to signal ANSWER message to remote player ${remotePlayerInfo.name} with message: ${answerMessage}`);
+    log(`${selfInfo.name} wants to signal ANSWER message to remote player ${remotePlayerInfo.name} with message: ${JSON.stringify(answerSignal)}`);
     
-    io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerMessage, selfInfo.name, socket.id)
+    io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerSignal, selfInfo.name, socket.id)
   });
 
   socket.on('exitFromAvailablePlayersRoom', (ackFn: AckFn) => {
@@ -231,7 +240,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', (reason) => {
-    log(`Player ${socketIDToPlayerInfo.get(socket.id)} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
+    const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
+    log(`Player ${selfInfo.name} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
 
     socketIDToPlayerInfo.delete(socket.id)
 
