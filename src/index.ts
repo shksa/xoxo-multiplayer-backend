@@ -47,7 +47,9 @@ interface PlayerInfo {
   avatar: string
 }
 
-let socketIDToPlayerInfo: Map<socketID, PlayerInfo> = new Map()
+const playerNames = new Set<string>()
+
+const socketIDToPlayerInfo = new Map<socketID, PlayerInfo>()
 
 const io = Server(serverConfig.port, {
   path: transportPath
@@ -88,8 +90,16 @@ io.on('connection', (socket) => {
 
   socket.on('registerNameAndAvatarWithSocket', (playerName: string, avatar: string, ackFn: AckFn) => {
     const playerInfo: PlayerInfo = {name: playerName, avatar}
+    if (playerNames.has(playerName)) {
+      const msg = `Could'nt register name "${playerName}" because some other player has the same name. Please choose a different name`
+      log(msg)
+      ackFn({message: msg, code: 401})
+      return
+    }
+    playerNames.add(playerName)
     socketIDToPlayerInfo.set(socket.id, playerInfo)
     const msg = `Name ${playerName}, and avatar registered with the socket`
+    log(msg)
     ackFn({message: msg, code: 200})
   })
 
@@ -184,7 +194,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('exitFromAvailablePlayersRoom', (ackFn: AckFn) => {
-    log(`Received request to leave AvailablePlayersRoom from ${socketIDToPlayerInfo.get(socket.id)}`);
+    const selfInfo =  socketIDToPlayerInfo.get(socket.id) as PlayerInfo
+    log(`Received request to leave AvailablePlayersRoom from ${selfInfo.name}`);
 
     socket.leave(AvailablePlayersRoomName, (err: Error) => {
       if (err) {
@@ -192,7 +203,7 @@ io.on('connection', (socket) => {
         ackFn({message: `could not leave AvailablePlayersRoom : ${err}`, code: 500})
         return
       }
-      log(`Player ${socketIDToPlayerInfo.get(socket.id)} with client ID ${socket.id} exited from the room AvailablePlayersRoom`)
+      log(`Player ${selfInfo.name} with client ID ${socket.id} exited from the room AvailablePlayersRoom`)
 
       ackFn({message: "left AvailablePlayersRoom!", code: 200})
       
@@ -205,7 +216,8 @@ io.on('connection', (socket) => {
   })
 
   socket.on('joinAvailablePlayersRoom', (ackFn: AckFn) => {
-    log('Received request to create or join room AvailablePlayersRoom' + ' from ' + socketIDToPlayerInfo.get(socket.id));
+    const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
+    log(`Received request to create or join room AvailablePlayersRoom from "${selfInfo.name.toUpperCase()}"`);
 
     socket.join(AvailablePlayersRoomName, (err) => {
       if (err) {
@@ -241,9 +253,11 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', (reason) => {
     const selfInfo = socketIDToPlayerInfo.get(socket.id) as PlayerInfo
-    log(`Player ${selfInfo.name} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
+    log(`Player ${selfInfo} with client ID ${socket.id} disconnected from the server, reason : ${reason}`)
 
     socketIDToPlayerInfo.delete(socket.id)
+
+    // playerNames.delete(selfInfo.name)
 
     const availablePlayers = GetAvailablePlayers()
     

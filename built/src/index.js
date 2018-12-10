@@ -22,7 +22,8 @@ switch (process.env.NODE_ENV) {
 console.log("serverConfig: ", serverConfig);
 const transportPath = "/xoxo-multiplayer-socketConnectionNamespace";
 const AvailablePlayersRoomName = "AvailablePlayersRoom";
-let socketIDToPlayerInfo = new Map();
+const playerNames = new Set();
+const socketIDToPlayerInfo = new Map();
 const io = socket_io_1.default(serverConfig.port, {
     path: transportPath
     // pingInterval: 6000,
@@ -54,8 +55,16 @@ io.on('connection', (socket) => {
     }
     socket.on('registerNameAndAvatarWithSocket', (playerName, avatar, ackFn) => {
         const playerInfo = { name: playerName, avatar };
+        if (playerNames.has(playerName)) {
+            const msg = `Could'nt register name "${playerName}" because some other player has the same name. Please choose a different name`;
+            log(msg);
+            ackFn({ message: msg, code: 401 });
+            return;
+        }
+        playerNames.add(playerName);
         socketIDToPlayerInfo.set(socket.id, playerInfo);
         const msg = `Name ${playerName}, and avatar registered with the socket`;
+        log(msg);
         ackFn({ message: msg, code: 200 });
     });
     socket.on('signalOfferToRemotePlayer', (offersignal, remotePlayerSocketID) => {
@@ -109,14 +118,15 @@ io.on('connection', (socket) => {
         io.to(remotePlayerSocketID).emit('answerFromRemotePlayer', answerSignal, selfInfo.name, socket.id);
     });
     socket.on('exitFromAvailablePlayersRoom', (ackFn) => {
-        log(`Received request to leave AvailablePlayersRoom from ${socketIDToPlayerInfo.get(socket.id)}`);
+        const selfInfo = socketIDToPlayerInfo.get(socket.id);
+        log(`Received request to leave AvailablePlayersRoom from ${selfInfo.name}`);
         socket.leave(AvailablePlayersRoomName, (err) => {
             if (err) {
                 log(`Trouble in leaving AvailablePlayersRoom : ${err}`);
                 ackFn({ message: `could not leave AvailablePlayersRoom : ${err}`, code: 500 });
                 return;
             }
-            log(`Player ${socketIDToPlayerInfo.get(socket.id)} with client ID ${socket.id} exited from the room AvailablePlayersRoom`);
+            log(`Player ${selfInfo.name} with client ID ${socket.id} exited from the room AvailablePlayersRoom`);
             ackFn({ message: "left AvailablePlayersRoom!", code: 200 });
             const availablePlayers = GetAvailablePlayers();
             log(`Room AvailablePlayersRoom now has ${availablePlayers.length} player(s)`);
@@ -124,7 +134,8 @@ io.on('connection', (socket) => {
         });
     });
     socket.on('joinAvailablePlayersRoom', (ackFn) => {
-        log('Received request to create or join room AvailablePlayersRoom' + ' from ' + socketIDToPlayerInfo.get(socket.id));
+        const selfInfo = socketIDToPlayerInfo.get(socket.id);
+        log(`Received request to create or join room AvailablePlayersRoom from "${selfInfo.name.toUpperCase()}"`);
         socket.join(AvailablePlayersRoomName, (err) => {
             if (err) {
                 log(`Trouble in joining AvailablePlayersRoom : ${err}`);
@@ -151,8 +162,9 @@ io.on('connection', (socket) => {
     });
     socket.on('disconnect', (reason) => {
         const selfInfo = socketIDToPlayerInfo.get(socket.id);
-        log(`Player ${selfInfo.name} with client ID ${socket.id} disconnected from the server, reason : ${reason}`);
+        log(`Player ${selfInfo} with client ID ${socket.id} disconnected from the server, reason : ${reason}`);
         socketIDToPlayerInfo.delete(socket.id);
+        // playerNames.delete(selfInfo.name)
         const availablePlayers = GetAvailablePlayers();
         log(`Room AvailablePlayersRoom now has ${availablePlayers.length} player(s)`);
         io.to(AvailablePlayersRoomName).emit("playersInAvailableRoom", availablePlayers);
